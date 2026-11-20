@@ -1,0 +1,16 @@
+From	To	Amount	Currency	DailyLimit
+Valid	Valid	ExactBalance	Different	Empty
+Valid	Missing	Zero	Same	ExactLimit
+Frozen	SameAsFrom	Normal	Same	Empty
+Frozen	Missing	Normal	Different	ExactLimit
+Frozen	Valid	OverBalance	Same	Empty
+Frozen	SameAsFrom	Zero	Different	Empty
+Valid	Valid	OverBalance	Different	ExactLimit
+Frozen	Valid	Zero	Same	Exceeded
+Valid	Missing	OverBalance	Different	Exceeded
+Valid	SameAsFrom	Normal	Same	Exceeded
+Missing	Valid	Normal	Same	Empty
+Frozen	SameAsFrom	ExactBalance	Same	ExactLimit
+Valid	Missing	ExactBalance	Different	Exceeded
+Missing	Missing	Zero	Different	Empty
+Valid	SameAsFrom	OverBalance	Different	ExactLimit

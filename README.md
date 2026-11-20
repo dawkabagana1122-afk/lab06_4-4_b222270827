@@ -113,3 +113,43 @@ tail -n +2 results/browser-3way.txt | wc -l   # 20
 | 3-way (`results/browser-3way.txt`) | **20** | 18 (3 × 3 × 2) | 144 |
 
 **Яагаад PICT 9 биш 10 өгсөн бэ:** PICT нь greedy алгоритм. Мөр бүрийг тухайн үед хамгийн олон хамраагүй хосыг хамарсан байхаар нэг нэгээр нь сонгодог, бүх хүснэгтийг нэг дор оновчлохгүй. Тиймээс хамгийн цөөн мөрийг заавал олохгүй. Лекцэд гараар 9 мөрөнд багтааж чадсан, харин PICT 1 мөр илүү гаргасан. Гэхдээ Content × Cookies-ийн 9 хос бүгд хамрагдаж, хос бүр дор хаяж нэг удаа гарсан нь хамгийн гол нь. 3-way нь 144-ийн **14%** буюу 20 мөр бөгөөд гурвалсан бүх хослолыг хамардаг.
+
+### B2 — Шилжүүлгийн модель PICT-ээр
+
+Хэсэг A-ийн сонголтуудыг PICT-ийн хэл рүү хөрвүүлсэн (`DailyLimit` бол далд орчны ангилал). Гурван хувилбар:
+
+- `transfer-nc.model` — хязгаарлалтгүй
+- `transfer.model` — A2-ын `[IF fromExists]` хязгаарлалттай:
+  `IF [From] = "Missing" THEN [To] <> "SameAsFrom" AND [Amount] IN {"Normal", "Zero"} AND [DailyLimit] = "Empty";`
+- `transfer-neg.model` — `[ERROR]` утгууд `~`-тэй (сөрөг), мөн IF хязгаарлалттай. PICT-ийн constraint дотор утгын нэрийг `~`-гүй бичдэг: `"Missing"`.
+
+```bash
+pict transfer-nc.model  > results/transfer-nc.txt
+pict transfer.model     > results/transfer.txt
+pict transfer-neg.model > results/transfer-neg.txt
+```
+
+| Хувилбар | Мөр | Алдаагүй мөр | Happy path мөр (Valid, Valid, Normal, Empty) | Нэг мөр дэх хамгийн их алдаа | Олон алдаатай мөр |
+|---|---|---|---|---|---|
+| `transfer-nc` | **13** | 0 | 0 | 4 | 10 |
+| `transfer` | **15** | 1 (`Valid Valid ExactBalance Different Empty`) | 0 | 3 | 12 |
+| `transfer-neg` | **19** | 5 | 2 | 1 | 0 |
+
+(«Алдаа» гэдэгт Frozen, Missing, SameAsFrom, Zero, OverBalance, Exceeded утгуудыг тооцсон.)
+
+**Ажиглалт:**
+- Хязгаарлалтгүй ба хязгаарлалттай хувилбарт **happy path огт гараагүй**. Мөр бүрд дунджаар 2–3 алдаа зэрэг орсон, жишээ нь `Missing SameAsFrom OverBalance Different ExactLimit` мөрөнд 3 алдаа бий. Ийм мөр давуу эрэмбийн дагуу зөвхөн эхний алдааг (`ERROR_NO_FROM`) шалгах бөгөөд бусад нь нуугдана (error masking). Тиймээс олон алдаатай мөр юуг шалгаж байгаа нь тодорхойгүй.
+- `transfer-nc`-д from байхгүй атлаа «ижил данс», «яг үлдэгдэл», «лимит» гэсэн утгагүй хослолтой 4 мөр гарсан. `transfer.model`-ийн хязгаарлалт тэдгээрийг арилгасан тул мөрийн тоо 13 → 15 болж өссөн. Хязгаарлалт нэмэхэд PICT үлдсэн хосуудыг хамрахын тулд өөр мөр нэмэх хэрэгтэй болдог.
+- `~` хэрэглэхэд мөр бүр **хамгийн ихдээ 1 алдаатай** болж, 5 алдаагүй мөр гарсан. Мөрийн тоо 19 болж өссөн, учир нь сөрөг утга бүр хүчинтэй утга бүртэй тусдаа мөрөнд хосолдог.
+- **`~` хэрэглэхэд A2-ын хязгаарлалт хэрэгтэй хэвээр үү?** Хэсэгчлэн хэрэгтэй. `~` нь алдаа × алдааг (жишээ нь `Missing × SameAsFrom`, `Missing × Exceeded`) өөрөө хаадаг тул хязгаарлалтын тэр хэсэг илүүц болно. Гэхдээ `~Missing × ExactBalance` эсвэл `~Missing × ExactLimit` хоёулаа «хүчинтэй» утгатай хослол тул `~` тэднийг хаахгүй. from байхгүй бол үлдэгдэл, лимит гэж байхгүй, тиймээс IF хязгаарлалт хэрэгтэй хэвээр.
+
+**PICT мөрөөс бодит тест кейс (Лаб 5-ын хэв маяг):**
+
+Нийтлэг setup: `ACC1` (MNT, үлдэгдэл 1 000 000₮, өдрийн лимит 5 000 000₮), `ACC2` (MNT). Ханш 1 USD = 3 500₮.
+
+| # | Эх мөр | Setup | Оролт (`POST /transfer`) | Oracle |
+|---|---|---|---|---|
+| P1 happy path | `transfer-neg` 3-р мөр: `Valid Valid Normal Same Empty` | ACC1 идэвхтэй, өнөөдөр 0₮ шилжүүлсэн; ACC2 байгаа | `{"from":"ACC1","to":"ACC2","amount":100000,"currency":"MNT"}` | **201**, `result = "OK"`; ACC1 үлдэгдэл 900 000₮ болсон |
+| P2 нэг алдаа | `transfer-neg` 9-р мөр: `Valid Valid ~Zero Different Empty` | ACC1 идэвхтэй, өнөөдөр 0₮; ACC2 байгаа | `{"from":"ACC1","to":"ACC2","amount":0,"currency":"USD"}` | **200**, `result = "ERROR_BAD_AMOUNT"`; үлдэгдэл өөрчлөгдөөгүй |
+| P3 нэг алдаа | `transfer-neg` 15-р мөр: `~Frozen Valid Normal Different ExactLimit` | `ACC_FROZEN` царцаагдсан, өнөөдөр 4 650 000₮ шилжүүлсэн (100 USD = 350 000₮-өөр яг лимитэд хүрнэ); ACC2 байгаа | `{"from":"ACC_FROZEN","to":"ACC2","amount":100,"currency":"USD"}` | **200**, `result = "ERROR_FROZEN"` |
+| P4 олон алдаа | `transfer` 6-р мөр: `Frozen SameAsFrom Zero Different Empty` | `ACC_FROZEN` царцаагдсан, өнөөдөр 0₮ | `{"from":"ACC_FROZEN","to":"ACC_FROZEN","amount":0,"currency":"USD"}` | **200**, `result = "ERROR_FROZEN"`. Давуу эрэмбээр from-ын шалгалт to (SAME_ACCOUNT) ба amount (BAD_AMOUNT)-аас түрүүлнэ. Нөгөө 2 алдаа энэ тестээр шалгагдахгүй. |

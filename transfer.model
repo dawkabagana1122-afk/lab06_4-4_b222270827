@@ -1,0 +1,8 @@
+From:       Valid, Frozen, Missing
+To:         Valid, Missing, SameAsFrom
+Amount:     Normal, ExactBalance, Zero, OverBalance
+Currency:   Same, Different
+DailyLimit: Empty, ExactLimit, Exceeded
+
+# A2: [IF fromExists] — from байхгүй бол "ижил данс", үлдэгдэл, лимит гэсэн ойлголт байхгүй
+IF [From] = "Missing" THEN [To] <> "SameAsFrom" AND [Amount] IN {"Normal", "Zero"} AND [DailyLimit] = "Empty";
